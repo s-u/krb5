@@ -148,3 +148,94 @@ SEXP C_klist() {
 	return res;
     }
 }
+
+SEXP C_kinit(SEXP sCache, SEXP sPrinc, SEXP sPwd, SEXP sKeytab, SEXP sValid) {
+    krb5_error_code kec;
+    krb5_ccache cache;
+    krb5_principal princ = 0;
+    const char *cache_name = 0;
+    const char *principal_name = 0;
+    const char *pwd = 0;
+    const char *keytab_name = 0;
+    char *final_pname = 0;
+    int validate_only = asInteger(sValid);
+    
+    int flags = 0;
+
+    if (TYPEOF(sCache) == STRSXP && LENGTH(sCache) > 0)
+	cache_name = CHAR(STRING_ELT(sCache, 0));
+    if (TYPEOF(sPrinc) == STRSXP && LENGTH(sPrinc) > 0)
+	principal_name = CHAR(STRING_ELT(sPrinc, 0));
+    if (TYPEOF(sPwd) == STRSXP && LENGTH(sPwd) > 0)
+	pwd = CHAR(STRING_ELT(sPwd, 0));
+    if (TYPEOF(sKeytab) == STRSXP && LENGTH(sKeytab) > 0)
+	keytab_name = CHAR(STRING_ELT(sKeytab, 0));
+
+    if (!keytab_name && !pwd) 
+	Rf_error("missing both keytab and password - please specify at least one");
+    if ((kec = krb5_init_context(&kcontext)))
+        krb_error(kec, "ERROR: cannot create Kerberos context");
+   
+    if (cache_name) {
+        if ((kec = krb5_cc_resolve(kcontext, cache_name, &cache)))
+	    krb_error(kec, "ERROR: cannot resolve specified cache");
+    } else {
+        if ((kec = krb5_cc_default(kcontext, &cache)))
+	    krb_error(kec, "ERROR: cannot get default cache");
+    }
+
+    /*    deftype = krb5_cc_get_type(k5->ctx, defcache);
+    if (krb5_cc_get_principal(k5->ctx, defcache, &defcache_princ) != 0)
+    defcache_princ = NULL; */
+
+
+    if (principal_name) {
+        if ((kec = krb5_parse_name_flags(kcontext, principal_name, flags, &princ)))
+	    krb_error(kec, "ERROR: cannot parse principal");
+    } else {
+	if ((kec = krb5_cc_get_principal(kcontext, cache, &princ)))
+	    krb_error(kec, "ERROR: cannot get principal from the cache");
+    }
+
+    if ((kec = krb5_unparse_name(kcontext, princ, &final_pname)))
+	krb_error(kec, "ERROR: cannot deparse principal name");
+
+    {
+	krb5_keytab keytab = 0;
+	krb5_creds my_creds;
+	krb5_get_init_creds_opt *options = NULL;
+
+	if (keytab_name && (kec = krb5_kt_resolve(kcontext, keytab_name, &keytab)))
+	    krb_error(kec, "ERROR: cannot open keytab");
+	
+	memset(&my_creds, 0, sizeof(my_creds));
+	if ((kec = krb5_get_init_creds_opt_alloc(kcontext, &options)))
+	    krb_error(kec, "ERROR: cannot allocate credential options");
+
+	if ((kec = krb5_get_init_creds_opt_set_out_ccache(kcontext, options, cache)))
+	    krb_error(kec, "ERROR: cannot set output cache");
+	
+	if (pwd) {
+	    if ((kec = krb5_get_init_creds_password(kcontext, &my_creds, princ, pwd,
+						    0, 0, 0, 0, options)))
+		krb_error(kec, "ERROR: getting initial credentials failed");
+	} else if (keytab_name) {
+	    if ((kec = krb5_get_init_creds_keytab(kcontext, &my_creds, princ, keytab,
+						  0, 0, options)))
+		krb_error(kec, "ERROR: getting initial credentials via keytab failed");
+	}
+	if (keytab)
+	    krb5_kt_close(kcontext, keytab);
+    }
+
+    /* FIXME: we don't release any of the above on error */
+    krb5_cc_close(kcontext, cache);
+
+    {
+	SEXP res = mkString(final_pname);
+        krb5_free_unparsed_name(kcontext, final_pname);
+	krb5_free_principal(kcontext, princ);
+	krb5_free_context(kcontext);
+	return res;
+    }
+}
