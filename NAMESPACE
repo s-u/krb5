@@ -1,0 +1,2 @@
+useDynLib(krb5, C_klist)
+export(klist)

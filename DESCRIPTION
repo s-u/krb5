@@ -1,0 +1,8 @@
+Package: krb5
+Title: Simple Kerberos client for R
+Version: 0.1
+Author: Simon Urbanek <simon.urbanek@R-project.org>
+Maintainer: Simon Urbanek <simon.urbanek@R-project.org>
+Description: Kerberos client for R.
+License: MIT + file LICENSE
+SystemRequirements: libkrb5
