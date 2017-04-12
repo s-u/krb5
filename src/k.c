@@ -149,7 +149,7 @@ SEXP C_klist() {
     }
 }
 
-SEXP C_kinit(SEXP sCache, SEXP sPrinc, SEXP sPwd, SEXP sKeytab, SEXP sValid) {
+SEXP C_kinit(SEXP sCache, SEXP sPrinc, SEXP sPwd, SEXP sKeytab) {
     krb5_error_code kec;
     krb5_ccache cache;
     krb5_principal princ = 0;
@@ -158,8 +158,7 @@ SEXP C_kinit(SEXP sCache, SEXP sPrinc, SEXP sPwd, SEXP sKeytab, SEXP sValid) {
     const char *pwd = 0;
     const char *keytab_name = 0;
     char *final_pname = 0;
-    int validate_only = asInteger(sValid);
-    
+
     int flags = 0;
 
     if (TYPEOF(sCache) == STRSXP && LENGTH(sCache) > 0)
