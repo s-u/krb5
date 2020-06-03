@@ -211,8 +211,10 @@ SEXP C_kinit(SEXP sCache, SEXP sPrinc, SEXP sPwd, SEXP sKeytab) {
 	if ((kec = krb5_get_init_creds_opt_alloc(kcontext, &options)))
 	    krb_error(kec, "ERROR: cannot allocate credential options");
 
+#ifndef __APPLE__
 	if ((kec = krb5_get_init_creds_opt_set_out_ccache(kcontext, options, cache)))
 	    krb_error(kec, "ERROR: cannot set output cache");
+#endif
 	
 	if (pwd) {
 	    if ((kec = krb5_get_init_creds_password(kcontext, &my_creds, princ, pwd,
@@ -223,6 +225,16 @@ SEXP C_kinit(SEXP sCache, SEXP sPrinc, SEXP sPwd, SEXP sKeytab) {
 						  0, 0, options)))
 		krb_error(kec, "ERROR: getting initial credentials via keytab failed");
 	}
+
+#ifdef __APPLE__
+	// Apple's GSS shim doesn't have krb5_get_init_creds_opt_set_out_ccache()
+	if ((kec = krb5_cc_initialize(kcontext, cache, princ)))
+	    krb_error(kec, "ERROR: could not initialize output cache");
+
+	if ((kec = krb5_cc_store_cred(kcontext, cache, &my_creds)))
+	    krb_error(kec, "ERROR: could not store credentials in cache");
+#endif
+
 	if (keytab)
 	    krb5_kt_close(kcontext, keytab);
     }
